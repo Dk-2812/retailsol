@@ -1,0 +1,38 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Copy files to Azure VM
+      uses: appleboy/scp-action@v0.1.6
+      with:
+        host: ${{ secrets.AZURE_HOST }}
+        username: ${{ secrets.AZURE_USER }}
+        key: ${{ secrets.AZURE_SSH_KEY }}
+        source: "."
+        target: "/var/www/RetailTechApp"
+
+    - name: Restart backend and rebuild frontend
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ secrets.AZURE_HOST }}
+        username: ${{ secrets.AZURE_USER }}
+        key: ${{ secrets.AZURE_SSH_KEY }}
+        script: |
+          cd /var/www/RetailTechApp/backend
+          npm install
+          pm2 restart retail-backend || pm2 start app.js --name retail-backend
+          cd /var/www/RetailTechApp/frontend
+          npm install
+          npm run build
+          sudo rm -rf /var/www/html/*
+          sudo cp -r dist/* /var/www/html/
